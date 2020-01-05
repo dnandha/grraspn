@@ -10,6 +10,7 @@ import pycocotools.mask as mask_util
 from PIL import Image
 
 from detectron2.structures import BoxMode
+from detectron2.data import DatasetCatalog, MetadataCatalog
 from detectron2.utils.logger import setup_logger
 from detectron2.utils.comm import get_world_size
 from fvcore.common.file_io import PathManager
@@ -127,6 +128,26 @@ def jacquard_files_to_dict(files, to_polygons):
 
     ret["annotations"] = annos
     return ret
+
+
+def register_jacquard_instances(name, image_dir):
+    DatasetCatalog.register(
+        name,
+        lambda x=image_dir: load_jacquard_instances(x, to_polygons=True),
+    )
+    MetadataCatalog.get(name).set(
+        thing_classes=os.listdir(image_dir),
+        image_dir=image_dir,
+        evaluator_type="jacquard"
+    )
+
+    #sem_key = key.format(task="sem_seg")
+    #DatasetCatalog.register(
+    #    sem_key, lambda x=image_dir, y=gt_dir: load_cityscapes_semantic(x, y)
+    #)
+    #MetadataCatalog.get(sem_key).set(
+    #    image_dir=image_dir, gt_dir=gt_dir, evaluator_type="sem_seg", **meta
+    #)
 
 
 if __name__ == "__main__":

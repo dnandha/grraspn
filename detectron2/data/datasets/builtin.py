@@ -23,6 +23,7 @@ from detectron2.data import MetadataCatalog, DatasetCatalog
 from .register_coco import register_coco_instances, register_coco_panoptic_separated
 from .lvis import register_lvis_instances, get_lvis_instances_meta
 from .cityscapes import load_cityscapes_instances, load_cityscapes_semantic
+from .jacquard import register_jacquard_instances
 from .pascal_voc import register_pascal_voc
 from .builtin_meta import _get_builtin_metadata
 
@@ -208,8 +209,19 @@ def register_all_pascal_voc(root="datasets"):
         MetadataCatalog.get(name).evaluator_type = "pascal_voc"
 
 
+# ==== Predefined splits for JACQUARD ===========
+def register_all_jacquard(root="datasets"):
+    SPLITS = [
+        ("jacquard_train", "jacquard/train"),
+        ("jacquard_val", "jacquard/val"),
+    ]
+    for name, dirname in SPLITS:
+        register_jacquard_instances(name, os.path.join(root, dirname))
+
+
 # Register them all under "./datasets"
 register_all_coco()
 register_all_lvis()
 register_all_cityscapes()
 register_all_pascal_voc()
+register_all_jacquard()
