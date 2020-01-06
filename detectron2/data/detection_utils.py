@@ -161,10 +161,13 @@ def transform_instance_annotations(
             transformed according to `transforms`.
             The "bbox_mode" field will be set to XYXY_ABS.
     """
-    bbox = BoxMode.convert(annotation["bbox"], annotation["bbox_mode"], BoxMode.XYXY_ABS)
-    # Note that bbox is 1d (per-instance bounding box)
-    annotation["bbox"] = transforms.apply_box([bbox])[0]
-    annotation["bbox_mode"] = BoxMode.XYXY_ABS
+    if annotation["bbox_mode"] == BoxMode.XYWHA_ABS:
+        annotation["bbox"] = transforms.apply_rotated_box(np.asarray([annotation["bbox"]]))[0]
+    else:
+        bbox = BoxMode.convert(annotation["bbox"], annotation["bbox_mode"], BoxMode.XYXY_ABS)
+        # Note that bbox is 1d (per-instance bounding box)
+        annotation["bbox"] = transforms.apply_box([bbox])[0]
+        annotation["bbox_mode"] = BoxMode.XYXY_ABS
 
     if "segmentation" in annotation:
         # each instance contains 1 or more polygons

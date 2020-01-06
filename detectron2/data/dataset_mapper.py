@@ -123,19 +123,16 @@ class DatasetMapper:
                     anno.pop("keypoints", None)
 
             # USER: Implement additional transformations if you have other types of data
+            annos = [
+                utils.transform_instance_annotations(
+                    obj, transforms, image_shape, keypoint_hflip_indices=self.keypoint_hflip_indices
+                )
+                for obj in dataset_dict.pop("annotations")
+                if obj.get("iscrowd", 0) == 0
+            ]
             # TODO bbox mode
-            #annos = [
-            #    utils.transform_instance_annotations(
-            #        obj, transforms, image_shape, keypoint_hflip_indices=self.keypoint_hflip_indices
-            #    )
-            #    for obj in dataset_dict.pop("annotations")
-            #    if obj.get("iscrowd", 0) == 0
-            #]
-            #instances = utils.annotations_to_instances(
-            #    annos, image_shape, mask_format=self.mask_format
-            #)
             instances = utils.annotations_to_instances_rotated(
-                dataset_dict["annotations"], image_shape
+                annos, image_shape
             )
             # Create a tight bounding box from masks, useful when image is cropped
             if self.crop_gen and instances.has("gt_masks"):
