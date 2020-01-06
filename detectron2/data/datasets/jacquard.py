@@ -115,16 +115,16 @@ def jacquard_files_to_dict(files, to_polygons):
 
     # treat each grasp as an instance
     anno = {}
-    anno["category_id"] = cat_id
+    anno["category_id"] = 0 #cat_id # TODO: assertion error
     anno["iscrowd"] = False #True # TODO: add together with seg mask
     anno["bbox_mode"] = BoxMode.XYWHA_ABS
     with open(grasps_file) as f:
         for i, line in enumerate(f):
             xc, yc, a, w, h = [float(v) for v in line[:-1].split(';')]
-            anno["bbox"] = (xc, yc, w, h, -a)
+            anno["bbox"] = (xc, yc, w, h, 360-a)
             annos.append(anno.copy())
-            if i >= 3:
-                break
+            #if i >= 3: # DEBUG
+            #    break
 
     ret["annotations"] = annos
     return ret
