@@ -116,7 +116,7 @@ def jacquard_files_to_dict(files, to_polygons):
     # treat each grasp as an instance
     anno = {}
     anno["category_id"] = cat_id
-    anno["iscrowd"] = True
+    anno["iscrowd"] = False #True # TODO: add together with seg mask
     anno["bbox_mode"] = BoxMode.XYWHA_ABS
     with open(grasps_file) as f:
         for i, line in enumerate(f):
