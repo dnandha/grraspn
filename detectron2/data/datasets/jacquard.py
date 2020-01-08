@@ -120,11 +120,11 @@ def jacquard_files_to_dict(files, to_polygons):
     anno["bbox_mode"] = BoxMode.XYWHA_ABS
     with open(grasps_file) as f:
         for i, line in enumerate(f):
-            xc, yc, a, w, h = [float(v) for v in line[:-1].split(';')]
-            anno["bbox"] = (xc, yc, w, h, 360-a)
+            # careful: potential mistake in jacquard format description on website, jaw and opening interchanged!
+            xc, yc, a, jaw, opening = [float(v) for v in line[:-1].split(';')]
+            # jaw = h, opening = w according to jacquard paper
+            anno["bbox"] = (xc, yc, opening, jaw, -a)
             annos.append(anno.copy())
-            #if i >= 3: # DEBUG
-            #    break
 
     ret["annotations"] = annos
     return ret
@@ -177,7 +177,7 @@ if __name__ == "__main__":
             args.image_dir, to_polygons=True
         )
         logger.info("Done loading {} samples.".format(len(dicts)))
-        meta = Metadata().set(thing_classes=os.listdir(args.image_dir))
+        meta = Metadata().set(thing_classes="thing")
 
     for d in dicts:
         img = np.array(Image.open(d["file_name"]))

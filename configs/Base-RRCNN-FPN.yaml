@@ -9,7 +9,7 @@ MODEL:
   ANCHOR_GENERATOR:
     NAME: "RotatedAnchorGenerator"
     SIZES: [[32], [64], [128], [256], [512]]  # One size for each in feature map
-    ASPECT_RATIOS: [[0.5, 2.0]]
+    ASPECT_RATIOS: [[2.0]]
     ANGLES: [[120, 90, 60, 30, 0, 330]]
   PROPOSAL_GENERATOR:
     NAME: "RRPN"
