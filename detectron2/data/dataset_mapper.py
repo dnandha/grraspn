@@ -130,8 +130,7 @@ class DatasetMapper:
                 for obj in dataset_dict.pop("annotations")
                 if obj.get("iscrowd", 0) == 0
             ]
-            # TODO bbox mode
-            instances = utils.annotations_to_instances_rotated(
+            instances = utils.annotations_to_instances(
                 annos, image_shape
             )
             # Create a tight bounding box from masks, useful when image is cropped
