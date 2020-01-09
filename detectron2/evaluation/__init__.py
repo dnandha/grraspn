@@ -3,6 +3,7 @@ from .cityscapes_evaluation import CityscapesEvaluator
 from .coco_evaluation import COCOEvaluator
 from .evaluator import DatasetEvaluator, DatasetEvaluators, inference_context, inference_on_dataset
 from .lvis_evaluation import LVISEvaluator
+from .jacquard_evaluation import JacquardEvaluator
 from .panoptic_evaluation import COCOPanopticEvaluator
 from .pascal_voc_evaluation import PascalVOCDetectionEvaluator
 from .sem_seg_evaluation import SemSegEvaluator
