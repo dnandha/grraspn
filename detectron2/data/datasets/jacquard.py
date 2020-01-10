@@ -122,6 +122,12 @@ def jacquard_files_to_dict(files, to_polygons):
         for i, line in enumerate(f):
             # careful: potential mistake in jacquard format description on website, jaw and opening interchanged!
             xc, yc, a, jaw, opening = [float(v) for v in line[:-1].split(';')]
+            assert xc >= 0, f"neg x value {grasps_file}"
+            assert yc >= 0, f"neg y value {grasps_file}"
+            #assert a >= 0, f"neg a value {grasps_file}"
+            assert jaw >= 0, f"neg jaw value {grasps_file}"
+            assert opening >= 0, f"neg opening value {grasps_file}"
+            assert jaw*opening >= 1, f"box area too small {grasps_file}"
             # jaw = h, opening = w according to jacquard paper
             anno["bbox"] = (xc, yc, opening, jaw, -a)
             annos.append(anno.copy())
@@ -136,7 +142,8 @@ def register_jacquard_instances(name, image_dir):
         lambda x=image_dir: load_jacquard_instances(x, to_polygons=True),
     )
     MetadataCatalog.get(name).set(
-        thing_classes=os.listdir(image_dir),
+        #thing_classes=os.listdir(image_dir), # TODO: add together with segmentation
+        thing_classes=["grasp", "nograsp"],
         image_dir=image_dir,
         evaluator_type="jacquard"
     )
