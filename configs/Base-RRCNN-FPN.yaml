@@ -13,6 +13,7 @@ MODEL:
     ANGLES: [[120, 90, 60, 30, 0, 330]]
   PROPOSAL_GENERATOR:
     NAME: "RRPN"
+    MIN_SIZE: 7
   RPN:
     HEAD_NAME: "StandardRPNHead"
     BBOX_REG_WEIGHTS: [1, 1, 1, 1, 1]
@@ -24,12 +25,12 @@ MODEL:
     # which is approximately 1000 proposals per-image since the default batch size for FPN is 2.
     POST_NMS_TOPK_TRAIN: 1000
     POST_NMS_TOPK_TEST: 1000
-    IOU_THRESHOLDS: [0.25, 0.7]  # min, max bounds (max bound to avoid overfitting)
-    #IOU_THRESHOLDS: [0.3, 0.7]  # min, max bounds (max bound to avoid overfitting)
+    IOU_THRESHOLDS: [0.3, 0.7]  # min, max bounds (max bound to avoid overfitting)
   ROI_HEADS:
     NAME: "RROIHeads"
     IN_FEATURES: ["p2", "p3", "p4", "p5"]
     IOU_THRESHOLDS: [0.5]
+    PROPOSAL_APPEND_GT: True ## TODO: Default True
   ROI_BOX_HEAD:
     NAME: "FastRCNNConvFCHead"
     NUM_FC: 2
@@ -46,7 +47,7 @@ DATASETS:
   TEST: ("jacquard_val",)
 SOLVER: 
   IMS_PER_BATCH: 4
-  BASE_LR: 0.02
+  BASE_LR: 0.01
   STEPS: (50000, 70000)
   MAX_ITER: 80000
   CHECKPOINT_PERIOD: 10000

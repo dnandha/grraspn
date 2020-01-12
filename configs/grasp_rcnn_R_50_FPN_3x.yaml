@@ -1,10 +1,13 @@
 _BASE_: "./Base-RRCNN-FPN.yaml"
+SEED: 123 #DEBUG
 MODEL:
   WEIGHTS: "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
+  #PIXEL_MEAN: [179.935, 180.711, 181.220] # jacquard 0-5
+  #PIXEL_STD: [1.0, 1.0, 1.0] #global std: [15.19078482 13.63024744 12.31188211]
   #MASK_ON: True # TODO
   #MASK_FORMAT: "bitmask"
   RESNETS:
     DEPTH: 50
-SOLVER:
-  STEPS: (210000, 250000)
-  MAX_ITER: 270000
+#SOLVER:
+#  STEPS: (210000, 250000)
+#  MAX_ITER: 270000
