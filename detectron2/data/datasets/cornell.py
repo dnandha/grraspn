@@ -5,6 +5,7 @@ import logging
 import multiprocessing as mp
 import numpy as np
 import os
+import re
 from itertools import chain
 import pycocotools.mask as mask_util
 from PIL import Image
@@ -22,7 +23,93 @@ except ImportError:
     pass
 
 
-def load_jacquard_instances(image_dir, to_polygons=True):
+class Grasp(object):
+    def __init__(self, points):
+        self.points = points
+
+    def __str__(self):
+        return str(self.points)
+
+    @property
+    def a_rad(self):
+        """
+        :return: Angle of the grasp to the horizontal.
+        """
+        dx = self.points[1, 1] - self.points[0, 1]
+        dy = self.points[1, 0] - self.points[0, 0]
+        return (np.arctan2(-dy, dx) + np.pi/2) % np.pi - np.pi/2
+
+    @property
+    def a(self):
+        return 180/np.pi * self.a_rad
+
+    @property
+    def c(self):
+        """
+        :return: Rectangle center point
+        """
+        return self.points.mean(axis=0).astype(np.int)
+
+    @property
+    def x(self):
+        return self.c[1]
+
+    @property
+    def y(self):
+        return self.c[0]
+
+    @property
+    def w(self):
+        """
+        :return: Rectangle width (i.e. perpendicular to the axis of the grasp)
+        """
+        dx = self.points[1, 1] - self.points[0, 1]
+        dy = self.points[1, 0] - self.points[0, 0]
+        return np.sqrt(dx ** 2 + dy ** 2)
+
+    @property
+    def h(self):
+        """
+        :return: Rectangle height (i.e. along the axis of the grasp)
+        """
+        dy = self.points[2, 1] - self.points[1, 1]
+        dx = self.points[2, 0] - self.points[1, 0]
+        return np.sqrt(dx ** 2 + dy ** 2)
+
+    @staticmethod
+    def load_grasps(f):
+        def text_to_num(l, offset=(0,0)):
+            x, y = l.split()
+            return [int(round(float(y))) - offset[0],
+                    int(round(float(x))) - offset[1]]
+
+        while True:
+         # Load 4 lines at a time, corners of bounding box.
+             try:
+                 p0 = f.readline()
+                 if not p0:
+                     break  # EOF
+                 p1, p2, p3 = f.readline(), f.readline(), f.readline()
+                 gr = np.array([
+                     text_to_num(p0),
+                     text_to_num(p1),
+                     text_to_num(p2),
+                     text_to_num(p3)
+                 ])
+
+                 yield Grasp(gr)
+
+             except ValueError:
+                 # Some files contain weird values.
+                 continue
+
+    @staticmethod
+    def load_grasps_plain(f):
+        for grasp in Grasp.load_grasps(f):
+            yield (grasp.x, grasp.y, grasp.w, grasp.h, grasp.a)
+
+
+def load_cornell_instances(image_dir, to_polygons=True):
     """
     Args:
         image_dir (str): path to the raw dataset. e.g., "~/cityscapes/leftImg8bit/train".
@@ -34,28 +121,28 @@ def load_jacquard_instances(image_dir, to_polygons=True):
         `Using Custom Datasets </tutorials/datasets.html>`_ )
     """
     files = []
-    for cat_id, subdir in enumerate(os.listdir(image_dir)):
-        dir_ = os.path.join(image_dir, subdir)
-        for grasps_file in glob.glob(f"{dir_}/*_grasps.txt"):
-            assert os.path.isfile(grasps_file), grasps_file
+    for grasps_file in glob.glob(os.path.join(image_dir, "*cpos.txt")):
+        assert os.path.isfile(grasps_file), grasps_file
 
-            image_file = grasps_file.replace("_grasps.txt", "_RGB.png")
-            assert os.path.isfile(image_file), image_file
+        cat_id = int(re.search("pcd(\d+)cpos.txt", grasps_file).group(1))
 
-            seg_file = grasps_file.replace("_grasps.txt", "_seg.png")
-            assert os.path.isfile(seg_file), seg_file
+        image_file = grasps_file.replace("cpos.txt", "r.png")
+        assert os.path.isfile(image_file), image_file
 
-            files.append((cat_id, image_file, seg_file, grasps_file))
+        neg_grasps_file = grasps_file.replace("cpos.txt", "cneg.txt") 
+        assert os.path.isfile(neg_grasps_file), neg_grasps_file
+
+        files.append((cat_id, image_file, grasps_file, neg_grasps_file))
     assert len(files), "No images found in {}".format(image_dir)
 
     logger = logging.getLogger(__name__)
-    logger.info("Preprocessing jacquard annotations ...")
+    logger.info("Preprocessing cornell annotations ...")
     # This is still not fast: all workers will execute duplicate works and will
     # take up to 10m on a 8GPU server.
     pool = mp.Pool(processes=max(mp.cpu_count() // get_world_size() // 2, 4))
 
     ret = pool.map(
-        functools.partial(jacquard_files_to_dict, to_polygons=to_polygons),
+        functools.partial(cornell_files_to_dict, to_polygons=to_polygons),
         files,
     )
     logger.info("Loaded {} images from {}".format(len(ret), image_dir))
@@ -69,9 +156,9 @@ def load_jacquard_instances(image_dir, to_polygons=True):
     return ret
 
 
-def jacquard_files_to_dict(files, to_polygons):
+def cornell_files_to_dict(files, to_polygons):
     """
-    Parse jacquard annotation files to a dict.
+    Parse cornell annotation files to a dict.
 
     Args:
         files (tuple): consists of (image_file, instance_id_file, label_id_file, json_file)
@@ -81,28 +168,22 @@ def jacquard_files_to_dict(files, to_polygons):
     Returns:
         A dict in Detectron2 Dataset format.
     """
-    cat_id, image_file, seg_file, grasps_file = files
+    cat_id, image_file, grasps_file, neg_grasps_file = files
 
     annos = []
 
     # See also the official annotation parsing scripts at
     # https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/evaluation/instances2dict.py  # noqa
-    with PathManager.open(seg_file, "rb") as f:
+    with PathManager.open(image_file, "rb") as f:
         inst_image = np.asarray(Image.open(f), order="F")
-    flattened_ids = np.unique(inst_image)
-    assert (len(flattened_ids) == 2 and 0 in flattened_ids and 1 in flattened_ids), f"too many or wrong seg classes: {image_file}, {flattened_ids}"
-    #flattened_ids = [0, 255]
-
-    # replace 255 with 0 and 0 with 255 # now done in separate preprocessing
-    #seg_mask = np.where(inst_image!=255, np.where(inst_image!=0,inst_image,255), 0)
+    #flattened_ids = np.unique(inst_image)
+    flattened_ids = [0, 255]
 
     ret = {
         "file_name": image_file,
         "image_id": os.path.basename(image_file),
         "height": inst_image.shape[0],
         "width": inst_image.shape[1],
-        "sem_seg_file_name": seg_file,
-        #"sem_seg" : inst_image # done in datamapper
     }
 
     #for instance_id in flattened_ids:
@@ -110,39 +191,47 @@ def jacquard_files_to_dict(files, to_polygons):
         #mask = np.asarray(inst_image == instance_id, dtype=np.uint8, order="F")
         #anno["segmentation"] = mask
 
+        #inds = np.nonzero(mask)
+        #ymin, ymax = inds[0].min(), inds[0].max()
+        #xmin, xmax = inds[1].min(), inds[1].max()
+        #anno["bbox"] = (xmin, ymin, xmax, ymax)
+        #if xmax <= xmin or ymax <= ymin:
+        #    continue
+        #anno["bbox_mode"] = BoxMode.XYXY_ABS
+
+
     # treat each grasp as an instance
     anno = {}
-    anno["category_id"] = 0 # cat_id # TODO
+    anno["category_id"] = 0 # cat_id # TODO: assertion error
     anno["iscrowd"] = False #True # TODO: add together with seg mask
     anno["bbox_mode"] = BoxMode.XYWHA_ABS
     with open(grasps_file) as f:
-        for i, line in enumerate(f):
-            # careful: potential mistake in jacquard format description on website, jaw and opening interchanged!
-            xc, yc, a, jaw, opening = [float(v) for v in line[:-1].split(';')]
+        for xc, yc, w, h, a in Grasp.load_grasps_plain(f):
+            # careful: potential mistake in cornell format description on website, jaw and opening interchanged!
+            #print(xc, yc, opening, jaw, a)
             assert xc >= 0, f"neg x value {grasps_file}"
             assert yc >= 0, f"neg y value {grasps_file}"
             #assert a >= 0, f"neg a value {grasps_file}"
-            assert jaw > 0, f"neg jaw value {grasps_file}"
-            assert opening > 0, f"neg opening value {grasps_file}"
-            assert jaw*opening >= 1, f"box area too small {grasps_file}"
-            # jaw = h, opening = w according to jacquard paper
-            anno["bbox"] = (xc, yc, opening, jaw, -a)
+            assert w > 0, f"neg jaw value {grasps_file}"
+            assert h > 0, f"neg opening value {grasps_file}"
+            assert w*h >= 1, f"box area too small {grasps_file}"
+            anno["bbox"] = (xc, yc, w, h, a)
             annos.append(anno.copy())
 
     ret["annotations"] = annos
     return ret
 
 
-def register_jacquard(name, image_dir):
+def register_cornell(name, image_dir):
     DatasetCatalog.register(
         name,
-        lambda x=image_dir: load_jacquard_instances(x, to_polygons=True),
+        lambda x=image_dir: load_cornell_instances(x, to_polygons=True),
     )
     MetadataCatalog.get(name).set(
-        thing_classes=["grasp", "nograsp"],#os.listdir(args.image_dir),
-        stuff_classes=["nothing", "thing"],
+        #thing_classes=os.listdir(image_dir), # TODO: add together with segmentation
+        thing_classes=["grasp", "nograsp"],
         image_dir=image_dir,
-        evaluator_type="jacquard"
+        evaluator_type="cornell"
     )
 
     #sem_key = key.format(task="sem_seg")
@@ -156,7 +245,7 @@ def register_jacquard(name, image_dir):
 
 if __name__ == "__main__":
     """
-    Test the jacquard dataset loader.
+    Test the cornell dataset loader.
 
     Usage:
         python -m detectron2.data.datasets.cityscapes \
@@ -173,18 +262,15 @@ if __name__ == "__main__":
 
     logger = setup_logger(name=__name__)
 
-    dirname = "jacquard-data-vis"
+    dirname = "cornell-data-vis"
     os.makedirs(dirname, exist_ok=True)
 
     if args.type == "instance":
-        dicts = load_jacquard_instances(
+        dicts = load_cornell_instances(
             args.image_dir, to_polygons=True
         )
         logger.info("Done loading {} samples.".format(len(dicts)))
-        meta = Metadata().set(
-            thing_classes=["grasp", "nograsp"],#os.listdir(args.image_dir),
-            stuff_classes=["nothing", "thing"]
-        )
+        meta = Metadata().set(thing_classes="thing")
 
     for d in dicts:
         img = np.array(Image.open(d["file_name"]))
