@@ -15,10 +15,11 @@ from .evaluator import DatasetEvaluator
 
 from detectron2.structures import RotatedBoxes, pairwise_iou_rotated
 from detectron2.evaluation.pascal_voc_evaluation import voc_ap 
+from detectron2.data.datasets.cornell import Grasp 
 
-class JacquardEvaluator(DatasetEvaluator):
+class CornellEvaluator(DatasetEvaluator):
     """
-    Evaluate instance segmentation results using jacquard
+    Evaluate instance segmentation results using cornell
 
     Note:
         * It does not work in multi-machine distributed training.
@@ -42,7 +43,7 @@ class JacquardEvaluator(DatasetEvaluator):
 
     def process(self, inputs, outputs):
         for input, output in zip(inputs, outputs):
-            file_name = input["file_name"].replace("_RGB.png", "_grasps.txt") # TODO: use image_id instead
+            file_name = input["file_name"].replace("r.png", "cpos.txt") # TODO: use image_id instead
             instances = output["instances"].to(self._cpu_device)
             #proposals = output["proposals"].to(self._cpu_device)
 
@@ -60,30 +61,27 @@ class JacquardEvaluator(DatasetEvaluator):
         """
         OVTHRES = 0.25 # TODO: make this configurable
 
-        def load_grasps(path): # TODO: duplicate code, see dataloader
-            with open(path) as f:
-                for i, line in enumerate(f):
-                    # careful: potential mistake in jacquard format description on website, jaw and opening interchanged!
-                    xc, yc, a, jaw, opening = [float(v) for v in line[:-1].split(';')]
-                    # jaw = h, opening = w according to jacquard paper
-                    yield (xc, yc, opening, jaw, -a)
-
         comm.synchronize()
         if not comm.is_main_process():
             return
 
-        mAP, mPrec, mRec = 0, 0, 0
-        nTotal = len(self._predictions)
+        #mAP, mPrec, mRec = 0, 0, 0
+        #nTotal = len(self._predictions)
         aps = []
+        ttps = 0
+        tfps = 0
+        totals = 0
         for pred in self._predictions:
             file_name, scores, boxes, classes = pred
-            boxes_gt = RotatedBoxes(list(load_grasps(file_name)))
+            boxes_gt = None
+            with open(file_name) as f:
+                boxes_gt = RotatedBoxes(list(Grasp.load_grasps_plain(f)))
 
+            totals += len(boxes)
             tps, fps = [], []
             # TODO: sort by confidence score?
-            inds = np.argsort(-scores, kind='mergesort')
-            boxes = boxes[inds]
-
+            #best_score_idx = torch.argmax(scores).item()
+            #best_box = boxes[best_score_idx]
             for j in range(len(boxes)):
                 box = boxes[j]
                 ovmax = float('-inf')
@@ -93,25 +91,27 @@ class JacquardEvaluator(DatasetEvaluator):
                     max_iou = torch.max(iou)
                     ovmax = np.max((ovmax, max_iou))
                 if ovmax > OVTHRES:
+                    ttps += 1
                     tps.append(1)
                     fps.append(0)
                 else:
+                    tfps += 1
                     fps.append(1)
                     tps.append(0)
 
             # compute precision recall
             fp = np.cumsum(np.array(fps))
             tp = np.cumsum(np.array(tps))
-            rec = tp / np.maximum(len(boxes_gt), torch.finfo(torch.float64).eps)
+            rec = tp / float(len(boxes_gt))
             # avoid divide by zero in case the first detection matches a difficult gt
             prec = tp / np.maximum(tp + fp, torch.finfo(torch.float64).eps)
             ap = voc_ap(rec, prec)
-            #mAP, mPrec, mRec = ap/nTotal, prec/nTotal, rec/nTotal
             aps.append(ap)
-            #print(mAP, mPrec, mRec)
+            #mAP, mPrec, mRec += np.mean(ap)/nTotal, np.mean(prec)/nTotal, np.mean(rec)/nTotal
 
         ret = OrderedDict()
-        ret["grasp"] = {"mAP": np.mean(aps)*100}
+        ret["grasp"] = {"mAP": np.mean(aps)*100, "Precision": ttps/(ttps+tfps), "Recall": ttps/totals}
+        #ret["grasp"] = {"mAP": mAP*100, "Precision": mPrec*100, "Recall": mRec*100}
         # TODO: add segm
 
         return ret

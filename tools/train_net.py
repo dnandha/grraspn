@@ -33,6 +33,7 @@ from detectron2.evaluation import (
     LVISEvaluator,
     PascalVOCDetectionEvaluator,
     JacquardEvaluator,
+    CornellEvaluator,
     SemSegEvaluator,
     verify_results,
 )
@@ -84,6 +85,8 @@ class Trainer(DefaultTrainer):
             return LVISEvaluator(dataset_name, cfg, True, output_folder)
         elif evaluator_type == "jacquard":
             return JacquardEvaluator(dataset_name)
+        elif evaluator_type == "cornell":
+            return CornellEvaluator(dataset_name)
         if len(evaluator_list) == 0:
             raise NotImplementedError(
                 "no Evaluator for the dataset {} with the type {}".format(
