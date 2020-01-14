@@ -1,0 +1,66 @@
+DATALOADER:
+  NUM_WORKERS: 6
+MODEL:
+  META_ARCHITECTURE: "PanopticFPN"
+  #META_ARCHITECTURE: "GeneralizedRCNN"
+  PANOPTIC_FPN:
+    COMBINE:
+      ENABLED: False # don't have instance masks
+  BACKBONE:
+    NAME: "build_resnet_fpn_backbone"
+  RESNETS:
+    OUT_FEATURES: ["res2", "res3", "res4", "res5"]
+  FPN:
+    IN_FEATURES: ["res2", "res3", "res4", "res5"]
+  ANCHOR_GENERATOR:
+    NAME: "RotatedAnchorGenerator"
+    SIZES: [[32], [64], [128], [256], [512]]  # One size for each in feature map
+    ASPECT_RATIOS: [[2.0]]
+    ANGLES: [[120, 90, 60, 30, 0, 330]]
+  PROPOSAL_GENERATOR:
+    NAME: "RRPN"
+    MIN_SIZE: 7 # VERY IMPORTANT! otherwise various crashes
+  RPN:
+    HEAD_NAME: "StandardRPNHead"
+    BBOX_REG_WEIGHTS: [1, 1, 1, 1, 1]
+    IN_FEATURES: ["p2", "p3", "p4", "p5", "p6"]
+    PRE_NMS_TOPK_TRAIN: 2000  # Per FPN level
+    PRE_NMS_TOPK_TEST: 1000  # Per FPN level
+    # Detectron1 uses 2000 proposals per-batch,
+    # (See "modeling/rpn/rpn_outputs.py" for details of this legacy issue)
+    # which is approximately 1000 proposals per-image since the default batch size for FPN is 2.
+    POST_NMS_TOPK_TRAIN: 1000
+    POST_NMS_TOPK_TEST: 1000
+    IOU_THRESHOLDS: [0.3, 0.7]  # min, max bounds (max bound to avoid overfitting)
+  ROI_HEADS:
+    NAME: "RROIHeads"
+    IN_FEATURES: ["p2", "p3", "p4", "p5"]
+    IOU_THRESHOLDS: [0.5]
+    PROPOSAL_APPEND_GT: True ## TODO: Default True
+    #NUM_CLASSES: 12000
+    NUM_CLASSES: 2
+  ROI_BOX_HEAD:
+    NAME: "FastRCNNConvFCHead"
+    NUM_FC: 2
+    POOLER_RESOLUTION: 7
+    POOLER_TYPE: "ROIAlignRotated"
+    BBOX_REG_WEIGHTS: [10, 10, 5, 5, 1]
+    #CLS_AGNOSTIC_BBOX_REG: False # enable cat_id's
+  SEM_SEG_HEAD:
+    LOSS_WEIGHT: 0.5
+    NUM_CLASSES: 2
+    #IGNORE_VALUE: 0
+DATASETS:
+  TRAIN: ("jacquard_train",)
+  #TRAIN: ("cornell",)
+  #TEST: ("jacquard_val",)
+  TEST: ("jacquard_val",)
+SOLVER: 
+  #NAME: "Adam"
+  IMS_PER_BATCH: 6
+  BASE_LR: 0.001
+  #STEPS: (50000, 70000)
+  MAX_ITER: 20000
+  CHECKPOINT_PERIOD: 5000
+INPUT:
+  MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
