@@ -230,6 +230,7 @@ def register_cornell(name, image_dir):
     MetadataCatalog.get(name).set(
         #thing_classes=os.listdir(image_dir), # TODO: add together with segmentation
         thing_classes=["grasp", "nograsp"],
+        stuff_classes=["nothing", "thing"],
         image_dir=image_dir,
         evaluator_type="cornell"
     )
@@ -270,7 +271,10 @@ if __name__ == "__main__":
             args.image_dir, to_polygons=True
         )
         logger.info("Done loading {} samples.".format(len(dicts)))
-        meta = Metadata().set(thing_classes="thing")
+        meta = Metadata().set(
+            thing_classes=["grasp", "nograsp"],
+            stuff_classes=["nothing", "thing"]
+        )
 
     for d in dicts:
         img = np.array(Image.open(d["file_name"]))
