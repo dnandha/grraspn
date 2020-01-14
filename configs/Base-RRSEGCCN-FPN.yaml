@@ -2,7 +2,6 @@ DATALOADER:
   NUM_WORKERS: 6
 MODEL:
   META_ARCHITECTURE: "PanopticFPN"
-  #META_ARCHITECTURE: "GeneralizedRCNN"
   PANOPTIC_FPN:
     COMBINE:
       ENABLED: False # don't have instance masks
