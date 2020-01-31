@@ -214,6 +214,7 @@ def register_all_pascal_voc(root="datasets"):
 def register_all_jacquard(root="datasets"):
     SPLITS = [
         ("jacquard", "jacquard"),
+        ("jacquard_test", "jacquard_test"),
         ("jacquard_samples", "jacquard_samples"),
         ("jacquard_train", "jacquard/train"),
         ("jacquard_val", "jacquard/val"),
@@ -225,8 +226,8 @@ def register_all_jacquard(root="datasets"):
 def register_all_cornell(root="datasets"):
     SPLITS = [
         ("cornell", "cornell"),
-        ("cornell_train", "cornell/train"),
-        ("cornell_val", "cornell/val"),
+        ("cornell_train", "cornell_train"),
+        ("cornell_val", "cornell_val"),
     ]
     for name, dirname in SPLITS:
         register_cornell(name, os.path.join(root, dirname))

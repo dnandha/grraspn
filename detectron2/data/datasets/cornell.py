@@ -126,7 +126,7 @@ def load_cornell_instances(image_dir, to_polygons=True):
 
         cat_id = int(re.search("pcd(\d+)cpos.txt", grasps_file).group(1))
 
-        image_file = grasps_file.replace("cpos.txt", "r.png")
+        image_file = grasps_file.replace("cpos.txt", "d.tiff")#"r.png") #TODO: using depth
         assert os.path.isfile(image_file), image_file
 
         neg_grasps_file = grasps_file.replace("cpos.txt", "cneg.txt") 
@@ -215,7 +215,29 @@ def cornell_files_to_dict(files, to_polygons):
             assert w > 0, f"neg jaw value {grasps_file}"
             assert h > 0, f"neg opening value {grasps_file}"
             assert w*h >= 1, f"box area too small {grasps_file}"
+
             anno["bbox"] = (xc, yc, w, h, a)
+
+            # classify angle region
+            #anno["category_id"] = int((a+90)/10) # 0 # cat_id # TODO
+            annos.append(anno.copy())
+
+    anno["category_id"] = 1 # cat_id # TODO: assertion error
+    with open(neg_grasps_file) as f:
+        for xc, yc, w, h, a in Grasp.load_grasps_plain(f):
+            # careful: potential mistake in cornell format description on website, jaw and opening interchanged!
+            #print(xc, yc, opening, jaw, a)
+            assert xc >= 0, f"neg x value {grasps_file}"
+            assert yc >= 0, f"neg y value {grasps_file}"
+            #assert a >= 0, f"neg a value {grasps_file}"
+            assert w > 0, f"neg jaw value {grasps_file}"
+            assert h > 0, f"neg opening value {grasps_file}"
+            assert w*h >= 1, f"box area too small {grasps_file}"
+
+            anno["bbox"] = (xc, yc, w, h, a)
+
+            # classify angle region
+            #anno["category_id"] = int((a+90)/10) # 0 # cat_id # TODO
             annos.append(anno.copy())
 
     ret["annotations"] = annos
@@ -230,6 +252,7 @@ def register_cornell(name, image_dir):
     MetadataCatalog.get(name).set(
         #thing_classes=os.listdir(image_dir), # TODO: add together with segmentation
         thing_classes=["grasp", "nograsp"],
+        #thing_classes=[f"{sector}grasp" for sector in range(18)], #TODO: put num-classes
         stuff_classes=["nothing", "thing"],
         image_dir=image_dir,
         evaluator_type="cornell"
@@ -273,6 +296,7 @@ if __name__ == "__main__":
         logger.info("Done loading {} samples.".format(len(dicts)))
         meta = Metadata().set(
             thing_classes=["grasp", "nograsp"],
+            #thing_classes=[f"{sector}grasp" for sector in range(18)],#os.listdir(args.image_dir),
             stuff_classes=["nothing", "thing"]
         )
 

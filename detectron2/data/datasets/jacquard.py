@@ -112,13 +112,13 @@ def jacquard_files_to_dict(files, to_polygons):
 
     # treat each grasp as an instance
     anno = {}
-    anno["category_id"] = 0 # cat_id # TODO
+    anno["category_id"] = 0
     anno["iscrowd"] = False #True # TODO: add together with seg mask
     anno["bbox_mode"] = BoxMode.XYWHA_ABS
     with open(grasps_file) as f:
         for i, line in enumerate(f):
-            # careful: potential mistake in jacquard format description on website, jaw and opening interchanged!
-            xc, yc, a, jaw, opening = [float(v) for v in line[:-1].split(';')]
+            # TODO: careful with orientation and jaw/opening order
+            xc, yc, a, opening, jaw = [float(v) for v in line[:-1].split(';')]
             assert xc >= 0, f"neg x value {grasps_file}"
             assert yc >= 0, f"neg y value {grasps_file}"
             #assert a >= 0, f"neg a value {grasps_file}"
@@ -126,7 +126,12 @@ def jacquard_files_to_dict(files, to_polygons):
             assert opening > 0, f"neg opening value {grasps_file}"
             assert jaw*opening >= 1, f"box area too small {grasps_file}"
             # jaw = h, opening = w according to jacquard paper
-            anno["bbox"] = (xc, yc, opening, jaw, -a)
+
+            a = -a# + 90
+            anno["bbox"] = (xc, yc, opening, jaw, a)
+    
+            # classify angle region
+            #anno["category_id"] = int((a+90)/10) # 0 # cat_id # TODO
             annos.append(anno.copy())
 
     ret["annotations"] = annos
@@ -140,6 +145,7 @@ def register_jacquard(name, image_dir):
     )
     MetadataCatalog.get(name).set(
         thing_classes=["grasp", "nograsp"],#os.listdir(args.image_dir),
+        #thing_classes=[f"{sector}grasp" for sector in range(18)], #TODO: put num-classes
         stuff_classes=["nothing", "thing"],
         image_dir=image_dir,
         evaluator_type="jacquard"
@@ -182,6 +188,7 @@ if __name__ == "__main__":
         )
         logger.info("Done loading {} samples.".format(len(dicts)))
         meta = Metadata().set(
+            #thing_classes=[f"{sector}grasp" for sector in range(18)],#os.listdir(args.image_dir),
             thing_classes=["grasp", "nograsp"],#os.listdir(args.image_dir),
             stuff_classes=["nothing", "thing"]
         )
