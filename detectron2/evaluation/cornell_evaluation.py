@@ -44,6 +44,7 @@ class CornellEvaluator(DatasetEvaluator):
     def process(self, inputs, outputs):
         for input, output in zip(inputs, outputs):
             file_name = input["file_name"].replace("r.png", "cpos.txt") # TODO: use image_id instead
+            neg_file_name = input["file_name"].replace("r.png", "cneg.txt") # TODO: use image_id instead
             instances = output["instances"].to(self._cpu_device)
             #proposals = output["proposals"].to(self._cpu_device)
 
@@ -51,7 +52,7 @@ class CornellEvaluator(DatasetEvaluator):
             boxes = instances.pred_boxes
             classes = instances.pred_classes
 
-            self._predictions.append((file_name, scores, boxes, classes))
+            self._predictions.append((file_name, neg_file_name, scores, boxes, classes))
             #self._predictions["proposals"].append(proposals)
 
     def evaluate(self):
@@ -60,58 +61,99 @@ class CornellEvaluator(DatasetEvaluator):
             dict: has a key "segm", whose value is a dict of "AP" and "AP50".
         """
         OVTHRES = 0.25 # TODO: make this configurable
+        ANGLEMAX = 30
 
         comm.synchronize()
         if not comm.is_main_process():
             return
 
-        #mAP, mPrec, mRec = 0, 0, 0
-        #nTotal = len(self._predictions)
-        aps = []
-        ttps = 0
-        tfps = 0
-        totals = 0
+        mAP, mPrec, mRec, mAcc = 0, 0, 0, 0
+        nTotal = len(self._predictions)
+        mTps, mFps, mTns, mFns = 0, 0, 0, 0
         for pred in self._predictions:
-            file_name, scores, boxes, classes = pred
+            file_name, neg_file_name, scores, boxes, classes = pred
             boxes_gt = None
+            neg_boxes_gt = None
             with open(file_name) as f:
                 boxes_gt = RotatedBoxes(list(Grasp.load_grasps_plain(f)))
+            with open(neg_file_name) as f:
+                neg_boxes_gt = RotatedBoxes(list(Grasp.load_grasps_plain(f)))
 
-            totals += len(boxes)
-            tps, fps = [], []
-            # TODO: sort by confidence score?
-            #best_score_idx = torch.argmax(scores).item()
-            #best_box = boxes[best_score_idx]
-            for j in range(len(boxes)):
+            # init true positives, false positives, true negatives, false negatives
+            tps, fps, tns, fns = [], [], [], []
+            # sort by confidence/score
+            boxes = boxes[np.argsort(-scores, kind='mergesort')]
+            TOP_N = 1
+            for j in range(TOP_N):
                 box = boxes[j]
-                ovmax = float('-inf')
-                for k in range(len(boxes_gt)):
-                    gt_box = boxes_gt[k]
-                    iou = pairwise_iou_rotated(box, gt_box) # TODO: assumes len(gts)>len(scores)
-                    max_iou = torch.max(iou)
-                    ovmax = np.max((ovmax, max_iou))
-                if ovmax > OVTHRES:
-                    ttps += 1
-                    tps.append(1)
-                    fps.append(0)
+                angle = box.tensor.squeeze()[2]
+                class_= classes[j]
+                if class_ == 0: #grasp
+                    ovmax = float('-inf')
+                    for k in range(len(boxes_gt)):
+                        box_gt = boxes_gt[k]
+                        angle_gt = box_gt.tensor.squeeze()[2]
+                        #print(sector*10, angle_gt)
+                        
+                        # compute iou on GPU
+                        iou = pairwise_iou_rotated(box, box_gt) # TODO: assumes len(gts)>len(scores)
+                        # get best match
+                        max_iou = torch.max(iou)
+                        ovmax = max((ovmax, max_iou))
+                    if ovmax > OVTHRES and abs(angle-angle_gt) <= ANGLEMAX:
+                        tps.append(1)
+                        fps.append(0)
+                        tns.append(0)
+                        fns.append(0)
+                        mTps += 1
+                    else:
+                        tps.append(0)
+                        fps.append(1)
+                        tns.append(0)
+                        fns.append(0)
+                        mFps += 1
                 else:
-                    tfps += 1
-                    fps.append(1)
-                    tps.append(0)
+                    ovmax = float('-inf')
+                    for k in range(len(neg_boxes_gt)):
+                        box_gt = neg_boxes_gt[k]
+                        angle_gt = box_gt.tensor.squeeze()[2]
+                        #print(sector*10, angle_gt)
+                        
+                        # compute iou on GPU
+                        iou = pairwise_iou_rotated(box, box_gt) # TODO: assumes len(gts)>len(scores)
+                        # get best match
+                        max_iou = torch.max(iou)
+                        ovmax = max((ovmax, max_iou))
+                    if ovmax > OVTHRES:# and abs(angle-angle_gt) <= ANGLEMAX:
+                        tps.append(0)
+                        fps.append(0)
+                        tns.append(1)
+                        fns.append(0)
+                        mTns += 1
+                    else:
+                        tps.append(0)
+                        fps.append(0)
+                        tns.append(0)
+                        fns.append(1)
+                        mFns += 1
 
-            # compute precision recall
+            # compute precision and recall
             fp = np.cumsum(np.array(fps))
             tp = np.cumsum(np.array(tps))
-            rec = tp / float(len(boxes_gt))
-            # avoid divide by zero in case the first detection matches a difficult gt
-            prec = tp / np.maximum(tp + fp, torch.finfo(torch.float64).eps)
-            ap = voc_ap(rec, prec)
-            aps.append(ap)
-            #mAP, mPrec, mRec += np.mean(ap)/nTotal, np.mean(prec)/nTotal, np.mean(rec)/nTotal
+            fn = np.cumsum(np.array(fns))
+            rec = tp / np.maximum(tp + fn, torch.finfo(torch.float64).eps) # avoid divide by zero
+            #brec = tp / np.maximum(len(boxes_gt), torch.finfo(torch.float64).eps) # avoid divide by zero
+            prec = tp / np.maximum(tp + fp, torch.finfo(torch.float64).eps) # avoid divide by zero
 
+            # let pascal voc compute ap
+            ap = voc_ap(rec, prec)
+
+            mAP += ap / nTotal
+
+        acc = (mTps+mTns) / (mTps+mFps+mTns+mFns)
+        what = mTps / (mTps+mFps)
         ret = OrderedDict()
-        ret["grasp"] = {"mAP": np.mean(aps)*100, "Precision": ttps/(ttps+tfps), "Recall": ttps/totals}
-        #ret["grasp"] = {"mAP": mAP*100, "Precision": mPrec*100, "Recall": mRec*100}
+        ret["grasp"] = {"mAP": mAP*100, "mAcc:": acc*100, "mWhatever": what*100}
         # TODO: add segm
 
         return ret

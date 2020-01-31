@@ -59,6 +59,7 @@ class JacquardEvaluator(DatasetEvaluator):
             dict: has a key "segm", whose value is a dict of "AP" and "AP50".
         """
         OVTHRES = 0.25 # TODO: make this configurable
+        ANGLEMAX = 30
 
         def load_grasps(path): # TODO: duplicate code, see dataloader
             with open(path) as f:
@@ -72,46 +73,57 @@ class JacquardEvaluator(DatasetEvaluator):
         if not comm.is_main_process():
             return
 
-        mAP, mPrec, mRec = 0, 0, 0
+        mAP, mPrec, mRec, mAcc = 0, 0, 0, 0
         nTotal = len(self._predictions)
-        aps = []
+        mTps, mFps = 0,0
         for pred in self._predictions:
             file_name, scores, boxes, classes = pred
             boxes_gt = RotatedBoxes(list(load_grasps(file_name)))
 
+            # init true positives, false positives
             tps, fps = [], []
-            # TODO: sort by confidence score?
-            inds = np.argsort(-scores, kind='mergesort')
-            boxes = boxes[inds]
-
-            for j in range(len(boxes)):
+            # sort by confidence/score
+            boxes = boxes[np.argsort(-scores, kind='mergesort')]
+            TOP_N = 1
+            for j in range(TOP_N):
                 box = boxes[j]
+                angle = box.tensor.squeeze()[2]
+                sector = classes[j]
                 ovmax = float('-inf')
                 for k in range(len(boxes_gt)):
-                    gt_box = boxes_gt[k]
-                    iou = pairwise_iou_rotated(box, gt_box) # TODO: assumes len(gts)>len(scores)
+                    box_gt = boxes_gt[k]
+                    angle_gt = box_gt.tensor.squeeze()[2]
+                    print(sector*10, angle_gt)
+                    
+                    # compute iou on GPU
+                    iou = pairwise_iou_rotated(box, box_gt) # TODO: assumes len(gts)>len(scores)
+                    # get best match
                     max_iou = torch.max(iou)
-                    ovmax = np.max((ovmax, max_iou))
-                if ovmax > OVTHRES:
+                    ovmax = max((ovmax, max_iou))
+                if ovmax > OVTHRES and abs(angle-angle_gt) <= ANGLEMAX:
                     tps.append(1)
                     fps.append(0)
+                    mTps += 1
                 else:
                     fps.append(1)
                     tps.append(0)
+                    mFps += 1
 
-            # compute precision recall
+            # compute precision and recall
             fp = np.cumsum(np.array(fps))
             tp = np.cumsum(np.array(tps))
-            rec = tp / np.maximum(len(boxes_gt), torch.finfo(torch.float64).eps)
-            # avoid divide by zero in case the first detection matches a difficult gt
-            prec = tp / np.maximum(tp + fp, torch.finfo(torch.float64).eps)
-            ap = voc_ap(rec, prec)
-            #mAP, mPrec, mRec = ap/nTotal, prec/nTotal, rec/nTotal
-            aps.append(ap)
-            #print(mAP, mPrec, mRec)
+            rec = tp / np.maximum(TOP_N, torch.finfo(torch.float64).eps) # avoid divide by zero
+            #brec = tp / np.maximum(len(boxes_gt), torch.finfo(torch.float64).eps) # avoid divide by zero
+            prec = tp / np.maximum(tp + fp, torch.finfo(torch.float64).eps) # avoid divide by zero
 
+            # let pascal voc compute ap
+            ap = voc_ap(rec, prec)
+
+            mAP += ap / nTotal
+
+        acc = mTps / (mTps+mFps)
         ret = OrderedDict()
-        ret["grasp"] = {"mAP": np.mean(aps)*100}
+        ret["grasp"] = {"mAP": mAP*100, "mAcc:": acc*100}
         # TODO: add segm
 
         return ret
