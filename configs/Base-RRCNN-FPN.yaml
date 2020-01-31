@@ -28,12 +28,12 @@ MODEL:
     POST_NMS_TOPK_TRAIN: 1000
     POST_NMS_TOPK_TEST: 1000
     IOU_THRESHOLDS: [0.3, 0.7]  # min, max bounds (max bound to avoid overfitting)
-    REG_LAMBDA: 2
+    REG_LAMBDA: 1
   ROI_HEADS:
     NAME: "RROIHeads"
     IN_FEATURES: ["p2", "p3", "p4", "p5"]
     IOU_THRESHOLDS: [0.5]
-    PROPOSAL_APPEND_GT: False ## TODO: Default True
+    PROPOSAL_APPEND_GT: True ## TODO: Default True
     NUM_CLASSES: 2 #18 # = 180/10 angle regions #2 before
   ROI_BOX_HEAD:
     NAME: "FastRCNNConvFCHead"
@@ -42,7 +42,7 @@ MODEL:
     POOLER_TYPE: "ROIAlignRotated"
     BBOX_REG_WEIGHTS: [10, 10, 5, 5, 1]
     CLS_AGNOSTIC_BBOX_REG: False
-    REG_LAMBDA: 3
+    REG_LAMBDA: 1
   #ROI_MASK_HEAD: # TODO
   #  NAME: "MaskRCNNConvUpsampleHead"
   #  NUM_CONV: 4
@@ -53,6 +53,7 @@ DATASETS:
 SOLVER: 
   IMS_PER_BATCH: 2
   BASE_LR: 0.0001
+  WEIGHT_DECAY: 0.0001
   STEPS: (6000, 15000)
   MAX_ITER: 30000
   CHECKPOINT_PERIOD: 3000

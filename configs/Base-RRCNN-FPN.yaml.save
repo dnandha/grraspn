@@ -1,10 +1,8 @@
+
 DATALOADER:
   NUM_WORKERS: 6
 MODEL:
-  META_ARCHITECTURE: "PanopticFPN"
-  PANOPTIC_FPN:
-    COMBINE:
-      ENABLED: False # don't have instance masks
+  META_ARCHITECTURE: "GeneralizedRCNN"
   BACKBONE:
     NAME: "build_resnet_fpn_backbone"
   RESNETS:
@@ -37,37 +35,27 @@ MODEL:
     IN_FEATURES: ["p2", "p3", "p4", "p5"]
     IOU_THRESHOLDS: [0.5]
     PROPOSAL_APPEND_GT: True ## TODO: Default True
-    #NUM_CLASSES: 12000
-    NUM_CLASSES: 18 # = 180/10 angle regions #2 before
+    NUM_CLASSES: 2 #18 # = 180/10 angle regions #2 before
   ROI_BOX_HEAD:
     NAME: "FastRCNNConvFCHead"
     NUM_FC: 2
     POOLER_RESOLUTION: 7
     POOLER_TYPE: "ROIAlignRotated"
     BBOX_REG_WEIGHTS: [10, 10, 5, 5, 1]
-    CLS_AGNOSTIC_BBOX_REG: False # enable cat_id's
+    CLS_AGNOSTIC_BBOX_REG: False
     REG_LAMBDA: 1
-  SEM_SEG_HEAD:
-    LOSS_WEIGHT: 0.5
-    NUM_CLASSES: 2
-    #IGNORE_VALUE: 0
+  #ROI_MASK_HEAD: # TODO
+  #  NAME: "MaskRCNNConvUpsampleHead"
+  #  NUM_CONV: 4
+  #  POOLER_RESOLUTION: 14
 DATASETS:
-  ##TRAIN: ("jacquard_samples",)
-  #TRAIN: ("jacquard_train",)
   TRAIN: ("cornell_train",)
-  TEST: ("jacquard_samples",)
-  #TEST: ("jacquard_val",)
   TEST: ("cornell_val",)
 SOLVER: 
-  #NAME: "Adam"
-  IMS_PER_BATCH: 6 # 2 per GPU
+  IMS_PER_BATCH: 2
   BASE_LR: 0.0001
-  WEIGHT_DECAY: 0.0001
-  STEPS: (50000, 70000)
-  MAX_ITER: 80000
-  CHECKPOINT_PERIOD: 5000
+  STEPS: (6000, 15000)
+  MAX_ITER: 30000
+  CHECKPOINT_PERIOD: 3000
 INPUT:
   MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
-#TEST:
-#  DETECTIONS_PER_IMAGE: 5
-
