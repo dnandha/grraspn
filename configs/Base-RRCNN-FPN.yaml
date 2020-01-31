@@ -32,27 +32,27 @@ MODEL:
     NAME: "RROIHeads"
     IN_FEATURES: ["p2", "p3", "p4", "p5"]
     IOU_THRESHOLDS: [0.5]
-    PROPOSAL_APPEND_GT: True ## TODO: Default True
-    NUM_CLASSES: 2
+    PROPOSAL_APPEND_GT: True #True ## TODO: Default True
+    NUM_CLASSES: 2 #18 # = 180/10 angle regions #2 before
   ROI_BOX_HEAD:
     NAME: "FastRCNNConvFCHead"
     NUM_FC: 2
     POOLER_RESOLUTION: 7
     POOLER_TYPE: "ROIAlignRotated"
     BBOX_REG_WEIGHTS: [10, 10, 5, 5, 1]
-    #MODEL.ROI_BOX_HEAD.CLS_AGNOSTIC_BBOX_REG
+    CLS_AGNOSTIC_BBOX_REG: False
   #ROI_MASK_HEAD: # TODO
   #  NAME: "MaskRCNNConvUpsampleHead"
   #  NUM_CONV: 4
   #  POOLER_RESOLUTION: 14
 DATASETS:
-  TRAIN: ("jacquard_train",)
-  TEST: ("jacquard_val",)
+  TRAIN: ("cornell_train",)
+  TEST: ("cornell_val",)
 SOLVER: 
-  IMS_PER_BATCH: 6
-  BASE_LR: 0.001
-  STEPS: (50000, 70000)
-  MAX_ITER: 80000
-  CHECKPOINT_PERIOD: 10000
+  IMS_PER_BATCH: 2
+  BASE_LR: 0.0001
+  STEPS: (6000, 15000)
+  MAX_ITER: 30000
+  CHECKPOINT_PERIOD: 3000
 INPUT:
   MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
