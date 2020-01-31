@@ -84,7 +84,16 @@ class Trainer(DefaultTrainer):
         elif evaluator_type == "lvis":
             return LVISEvaluator(dataset_name, cfg, True, output_folder)
         elif evaluator_type == "jacquard":
-            return JacquardEvaluator(dataset_name)
+            evaluator_list.append(JacquardEvaluator(dataset_name))
+            evaluator_list.append(
+                SemSegEvaluator(
+                    dataset_name,
+                    distributed=True,
+                    num_classes=cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES,
+                    ignore_label=cfg.MODEL.SEM_SEG_HEAD.IGNORE_VALUE,
+                    output_dir=output_folder,
+                )
+            )
         elif evaluator_type == "cornell":
             return CornellEvaluator(dataset_name)
         if len(evaluator_list) == 0:
