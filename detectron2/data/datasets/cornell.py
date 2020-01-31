@@ -126,7 +126,8 @@ def load_cornell_instances(image_dir, to_polygons=True):
 
         cat_id = int(re.search("pcd(\d+)cpos.txt", grasps_file).group(1))
 
-        image_file = grasps_file.replace("cpos.txt", "d.tiff")#"r.png") #TODO: using depth
+        image_file = grasps_file.replace("cpos.txt", "r.png")
+        #image_file = grasps_file.replace("cpos.txt", "d.tiff") #TODO: using depth
         assert os.path.isfile(image_file), image_file
 
         neg_grasps_file = grasps_file.replace("cpos.txt", "cneg.txt") 
