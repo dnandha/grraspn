@@ -231,6 +231,11 @@ class RROIHeads(StandardROIHeads):
         num_bg_samples = []
         for proposals_per_image, targets_per_image in zip(proposals, targets):
             has_gt = len(targets_per_image) > 0
+            # DEBUG
+            #assert torch.all(targets_per_image.gt_boxes.tensor[:,2] > 1e-5)
+            #assert torch.all(targets_per_image.gt_boxes.tensor[:,3] > 1e-5)
+            #assert torch.all(proposals_per_image.proposal_boxes.tensor[:,2] > 1e-5)
+            #assert torch.all(proposals_per_image.proposal_boxes.tensor[:,3] > 1e-5)
             match_quality_matrix = pairwise_iou_rotated(
                 targets_per_image.gt_boxes, proposals_per_image.proposal_boxes
             )
@@ -288,6 +293,7 @@ class RROIHeads(StandardROIHeads):
             pred_proposal_deltas,
             proposals,
             self.smooth_l1_beta,
+            self.lambda_,
         )
         if self.training:
             return outputs.losses()

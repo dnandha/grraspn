@@ -143,6 +143,7 @@ class ROIHeads(torch.nn.Module):
         self.feature_channels         = {k: v.channels for k, v in input_shape.items()}
         self.cls_agnostic_bbox_reg    = cfg.MODEL.ROI_BOX_HEAD.CLS_AGNOSTIC_BBOX_REG
         self.smooth_l1_beta           = cfg.MODEL.ROI_BOX_HEAD.SMOOTH_L1_BETA
+        self.lambda_                  = cfg.MODEL.ROI_BOX_HEAD.REG_LAMBDA
         # fmt: on
 
         # Matcher to assign box proposals to gt boxes
@@ -402,6 +403,7 @@ class Res5ROIHeads(ROIHeads):
             pred_proposal_deltas,
             proposals,
             self.smooth_l1_beta,
+            self.lambda_
         )
 
         if self.training:
@@ -627,6 +629,7 @@ class StandardROIHeads(ROIHeads):
             pred_proposal_deltas,
             proposals,
             self.smooth_l1_beta,
+            self.lambda_
         )
         if self.training:
             return outputs.losses()

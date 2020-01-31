@@ -154,6 +154,7 @@ class RRPNOutputs(RPNOutputs):
         boundary_threshold=0,
         gt_boxes=None,
         smooth_l1_beta=0.0,
+        lambda_=1,
     ):
         """
         Args:
@@ -195,6 +196,7 @@ class RRPNOutputs(RPNOutputs):
             boundary_threshold,
             gt_boxes,
             smooth_l1_beta,
+            lambda_,
         )
 
     def _get_ground_truth(self):
@@ -215,6 +217,11 @@ class RRPNOutputs(RPNOutputs):
             anchors_i: anchors for i-th image
             gt_boxes_i: ground-truth boxes for i-th image
             """
+            # DEBUG
+            #assert torch.all(gt_boxes_i.tensor[:,2] > 1e-5)
+            #assert torch.all(gt_boxes_i.tensor[:,3] > 1e-5)
+            #assert torch.all(anchors_i.tensor[:,2] > 1e-5)
+            #assert torch.all(anchors_i.tensor[:,3] > 1e-5)
             match_quality_matrix = pairwise_iou_rotated(gt_boxes_i, anchors_i)
             matched_idxs, gt_objectness_logits_i = self.anchor_matcher(match_quality_matrix)
 

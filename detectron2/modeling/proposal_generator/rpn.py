@@ -99,6 +99,7 @@ class RPN(nn.Module):
         self.positive_fraction       = cfg.MODEL.RPN.POSITIVE_FRACTION
         self.smooth_l1_beta          = cfg.MODEL.RPN.SMOOTH_L1_BETA
         self.loss_weight             = cfg.MODEL.RPN.LOSS_WEIGHT
+        self.lambda_                 = cfg.MODEL.RPN.REG_LAMBDA
         # fmt: on
 
         # Map from self.training state to train/test settings

@@ -60,6 +60,7 @@ class RRPN(RPN):
             self.boundary_threshold,
             gt_boxes,
             self.smooth_l1_beta,
+            self.lambda_
         )
 
         if self.training:
