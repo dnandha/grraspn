@@ -204,6 +204,7 @@ class RPNOutputs(object):
         boundary_threshold=0,
         gt_boxes=None,
         smooth_l1_beta=0.0,
+        lambda_=1
     ):
         """
         Args:
@@ -246,6 +247,7 @@ class RPNOutputs(object):
         self.image_sizes = images.image_sizes
         self.boundary_threshold = boundary_threshold
         self.smooth_l1_beta = smooth_l1_beta
+        self.lambda_ = lambda_
 
     def _get_ground_truth(self):
         """
@@ -391,7 +393,7 @@ class RPNOutputs(object):
         )
         normalizer = 1.0 / (self.batch_size_per_image * self.num_images)
         loss_cls = objectness_loss * normalizer  # cls: classification loss
-        loss_loc = localization_loss * normalizer  # loc: localization loss
+        loss_loc = self.lambda_ * localization_loss * normalizer  # loc: localization loss
         losses = {"loss_rpn_cls": loss_cls, "loss_rpn_loc": loss_loc}
 
         return losses

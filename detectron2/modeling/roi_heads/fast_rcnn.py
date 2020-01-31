@@ -124,7 +124,7 @@ class FastRCNNOutputs(object):
     """
 
     def __init__(
-        self, box2box_transform, pred_class_logits, pred_proposal_deltas, proposals, smooth_l1_beta
+        self, box2box_transform, pred_class_logits, pred_proposal_deltas, proposals, smooth_l1_beta, lambda_=1
     ):
         """
         Args:
@@ -152,6 +152,7 @@ class FastRCNNOutputs(object):
         self.pred_class_logits = pred_class_logits
         self.pred_proposal_deltas = pred_proposal_deltas
         self.smooth_l1_beta = smooth_l1_beta
+        self.lambda_ = lambda_
 
         box_type = type(proposals[0].proposal_boxes)
         # cat(..., dim=0) concatenates over all images in the batch
@@ -264,7 +265,7 @@ class FastRCNNOutputs(object):
         """
         return {
             "loss_cls": self.softmax_cross_entropy_loss(),
-            "loss_box_reg": self.smooth_l1_loss(),
+            "loss_box_reg": self.lambda_ * self.smooth_l1_loss(),
         }
 
     def predict_boxes(self):
