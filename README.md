@@ -17,19 +17,23 @@ Then, correlate Bus/DeviceID's to those of `nvidia-smi`.
 
 # Train
 Run training on TRAIN dataset specified in given config:
+
 `CUDA_VISIBLE_DEVICES="2,3" python tools/train_net.py --config-file configs/grasp_rcnn_R_50_FPN_3x.yaml --num-gpus 2`
 
 To resume training from last model checkpoint, add `--resume` flag.0
 
 # Validate
 Run validation on TEST dataset specified in given config and use last model checkpoint:
+
 `CUDA_VISIBLE_DEVICES="2,3" python tools/train_net.py --config-file configs/grasp_rcnn_R_50_FPN_3x.yaml --num-gpus 2 --eval --resume`
 
 
 # Test
 Save image with predicted grasps to given output directory:
+
 `CUDA_VISIBLE_DEVICES="2,3" python demo/demo.py --config-file configs/grasp_rcnn_R_50_FPN_3x.yaml --input <INPUT_IMAGE> --output <OUTDIR> --opts MODEL.WEIGHTS <MODELPATH>`
 
 # Inference
 Save grasp predictions to text file Jacquard data format:
+
 `CUDA_VISIBLE_DEVICES="2,3" python demo/inference.py <INPUT_IMAGE_DIR> <OUTPUT_FILE>`
