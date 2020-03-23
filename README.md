@@ -5,7 +5,7 @@
 1. Intall pycocotools: `pip install pycocotools`
 1. Install opencv: `pip install opencv-python`
 1. Export CUDA path: `export CUDA_HOME="/usr/local/cuda-10.1"`
-1. Clone source: `git clone https://git.ias.informatik.tu-darmstadt.de/object_grasping/grasp_rrpn.git`
+1. Clone source: `git clone <link to this repo>`
 1. Compile and install project: `cd grasp_rrpn/ && pip install -e .`
 
 # Find out usable GPU's
